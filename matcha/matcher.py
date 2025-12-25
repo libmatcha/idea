@@ -130,18 +130,39 @@ class Matcher:
         
         Tries matching from max_len down to min_len to find a valid continuation.
         """
-        char_set = set(node.char_set)
+        # Handle literal string matching (e.g., `black`|`WHITE`)
+        if node.literals:
+            return self._match_literals(text, text_pos, ast_idx, node)
+        
+        # char_set=None means X type (matches any character)
+        is_wildcard = node.char_set is None and not node.literals
+        char_set = set(node.char_set) if node.char_set else None
+        negated = node.negated
         
         # Count how many consecutive characters match the pattern
         match_len = 0
         pos = text_pos
         
-        while pos < len(text) and text[pos] in char_set:
-            match_len += 1
-            pos += 1
+        while pos < len(text):
+            char = text[pos]
+            # Determine if this character matches
+            if is_wildcard:
+                matches = True
+            elif negated:
+                # Negated: match if char is NOT in char_set
+                matches = char not in char_set
+            else:
+                # Normal: match if char IS in char_set
+                matches = char in char_set
             
-            # Stop if we've reached max length
-            if node.max_len is not None and match_len >= node.max_len:
+            if matches:
+                match_len += 1
+                pos += 1
+                
+                # Stop if we've reached max length
+                if node.max_len is not None and match_len >= node.max_len:
+                    break
+            else:
                 break
         
         # Try lengths from max to min (greedy with backtracking)
@@ -169,6 +190,23 @@ class Matcher:
             success, end_pos = self._match_at(text, text_pos, ast_idx + 1)
             if success:
                 return True, end_pos
+        
+        return False, text_pos
+    
+    def _match_literals(
+        self, text: str, text_pos: int, ast_idx: int, node: PatternNode
+    ) -> tuple[bool, int]:
+        """
+        Match literal strings from a list of alternatives.
+        
+        Example: node.literals = ["black", "WHITE"] matches either "black" or "WHITE"
+        """
+        for literal in node.literals:
+            if text[text_pos:].startswith(literal):
+                # Found a matching literal, try to continue with rest of pattern
+                success, end_pos = self._match_at(text, text_pos + len(literal), ast_idx + 1)
+                if success:
+                    return True, end_pos
         
         return False, text_pos
 

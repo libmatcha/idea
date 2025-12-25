@@ -4,8 +4,8 @@ Parser for SimpleMatch patterns.
 Converts a token stream into an Abstract Syntax Tree (AST).
 """
 
-from dataclasses import dataclass
-from typing import List, Union
+from dataclasses import dataclass, field
+from typing import List, Union, Optional
 from matcha.lexer import Lexer
 from matcha.tokens import Token, TokenType
 
@@ -22,13 +22,18 @@ class LiteralNode:
 @dataclass
 class PatternNode:
     """AST node for a pattern token [type:range:length]."""
-    char_set: str
+    char_set: Optional[str]
     min_len: int
     max_len: int | None  # None means unbounded
+    negated: bool = False  # If True, match characters NOT in char_set
+    literals: Optional[list[str]] = None  # Literal strings to match
     
     def __repr__(self) -> str:
         max_str = str(self.max_len) if self.max_len else "∞"
-        return f"Pattern(chars={self.char_set!r}, len={self.min_len}-{max_str})"
+        neg = "!" if self.negated else ""
+        if self.literals:
+            return f"Pattern(literals={self.literals}, len={self.min_len}-{max_str})"
+        return f"Pattern(chars={neg}{self.char_set!r}, len={self.min_len}-{max_str})"
 
 
 # AST is a list of nodes
@@ -82,5 +87,8 @@ class Parser:
         return PatternNode(
             char_set=token.char_set,
             min_len=length.get_min(),
-            max_len=length.get_max()
+            max_len=length.get_max(),
+            negated=token.negated,
+            literals=token.literals
         )
+

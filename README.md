@@ -1,4 +1,5 @@
 # Matcha
+## match pattern with cup of matcha
 
 A simple, human-readable pattern matching library as an alternative to regex.
 
@@ -42,6 +43,7 @@ The core token format is: `[type:range:length]`
 | `hex` | `0-9a-fA-F` | Hexadecimal characters |
 | `oct` | `0-7` | Octal digits |
 | `bin` | `01` | Binary digits |
+| `x` | *(any)* | Any character (wildcard) |
 
 ### Range (Optional)
 

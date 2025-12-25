@@ -22,6 +22,7 @@ class CharType(Enum):
     OCT = "oct"      # Octal: 0-7
     DEC = "dec"      # Decimal: 0-9
     BIN = "bin"      # Binary: 01
+    X = "x"          # Any character (wildcard)
 
 
 # Default character sets for each type
@@ -77,8 +78,14 @@ class Token:
     char_type: Optional[CharType] = None
     char_set: Optional[str] = None  # Resolved character set to match against
     length: Optional[LengthConstraint] = None
+    negated: bool = False  # If True, match characters NOT in char_set
+    literals: Optional[list[str]] = None  # Literal strings to match (e.g., [`black`|`WHITE`])
     
     def __repr__(self) -> str:
         if self.token_type == TokenType.LITERAL:
             return f"LITERAL({self.value!r})"
-        return f"PATTERN(type={self.char_type.value}, chars={self.char_set!r}, len={self.length})"
+        neg = "!" if self.negated else ""
+        if self.literals:
+            return f"PATTERN(type={self.char_type.value}, literals={self.literals}, len={self.length})"
+        return f"PATTERN(type={self.char_type.value}, chars={neg}{self.char_set!r}, len={self.length})"
+

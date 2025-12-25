@@ -96,7 +96,7 @@ class Lexer:
         char_type = self._parse_char_type(type_str, start_pos)
         
         # Parse range (or use default)
-        char_set = self._parse_range(range_str, char_type)
+        char_set, negated, literals = self._parse_range(range_str, char_type)
         
         # Parse length constraint
         length_constraint = self._parse_length(length_str, start_pos)
@@ -106,7 +106,9 @@ class Lexer:
             value=f"[{content}]",
             char_type=char_type,
             char_set=char_set,
-            length=length_constraint
+            length=length_constraint,
+            negated=negated,
+            literals=literals
         )
     
     def _parse_char_type(self, type_str: str, pos: int) -> CharType:
@@ -121,7 +123,7 @@ class Lexer:
                 pos
             )
     
-    def _parse_range(self, range_str: str, char_type: CharType) -> str:
+    def _parse_range(self, range_str: str, char_type: CharType) -> tuple[str, bool, list[str]]:
         """
         Parse the character range, or return default for the type.
         
@@ -130,12 +132,34 @@ class Lexer:
         - Range: A-Z, a-z, 0-9
         - Alternatives: S|s, A|B|C
         - Combined: A-Za-z
+        - X type: returns None (matches any character)
+        - NOT: !A-Z (matches anything except A-Z)
+        - Literals: `black`|`WHITE` (matches exact strings)
+        
+        Returns:
+            tuple of (char_set, negated, literals)
         """
         range_str = range_str.strip()
         
-        if not range_str:
-            return DEFAULT_CHAR_SETS[char_type]
+        # X type matches any character - return None to signal wildcard
+        if char_type == CharType.X:
+            return None, False, None
         
+        if not range_str:
+            return DEFAULT_CHAR_SETS[char_type], False, None
+        
+        # Check for negation prefix
+        negated = False
+        if range_str.startswith('!'):
+            negated = True
+            range_str = range_str[1:]
+        
+        # Check if this is a literal pattern (contains backticks)
+        if '`' in range_str:
+            literals = self._parse_literals(range_str)
+            return None, negated, literals
+        
+        # Parse character set
         char_set = set()
         i = 0
         
@@ -162,7 +186,33 @@ class Lexer:
                 char_set.add(char)
                 i += 1
         
-        return ''.join(sorted(char_set))
+        return ''.join(sorted(char_set)), negated, None
+    
+    def _parse_literals(self, range_str: str) -> list[str]:
+        """
+        Parse literal strings from backtick-delimited format.
+        
+        Example: `black`|`WHITE` -> ["black", "WHITE"]
+        """
+        literals = []
+        i = 0
+        
+        while i < len(range_str):
+            if range_str[i] == '`':
+                # Find closing backtick
+                end = range_str.find('`', i + 1)
+                if end == -1:
+                    # Unclosed backtick, treat rest as literal
+                    literals.append(range_str[i + 1:])
+                    break
+                literals.append(range_str[i + 1:end])
+                i = end + 1
+            elif range_str[i] == '|':
+                i += 1
+            else:
+                i += 1
+        
+        return literals if literals else None
     
     def _parse_length(self, length_str: str, pos: int) -> LengthConstraint:
         """
